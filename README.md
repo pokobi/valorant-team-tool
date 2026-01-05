@@ -1,6 +1,6 @@
 # Valorant カスタムマッチ チーム分け & マップ選択ツール
 
-### https://pokobi.github.io/pokobi.github.io-valorant-team-tool/
+### https://pokobi.github.io/valorant-team-tool/
 
 Valorantの5v5カスタムマッチにおける、ランダムなチーム分けとマップ選択を自動化するWebアプリケーション。
 
