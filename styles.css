@@ -35,6 +35,12 @@ h1, h2 {
     background-color: #f9f9f9;
 }
 
+.bulk-actions {
+    margin-bottom: 15px;
+    display: flex;
+    gap: 10px;
+}
+
 .player-entry {
     display: flex;
     align-items: center;
@@ -71,6 +77,15 @@ button {
     transition: background-color 0.3s ease;
 }
 
+.secondary-button {
+    background-color: #95a5a6;
+    color: white;
+}
+
+.secondary-button:hover {
+    background-color: #7f8c8d;
+}
+
 .player-entry button {
     flex-shrink: 0;
     background-color: #e74c3c;
@@ -93,22 +108,6 @@ button {
     background-color: #2980b9;
 }
 
-.delete-player-button {
-    padding: 8px 15px;
-    border: none;
-    border-radius: 4px;
-    cursor: pointer;
-    font-size: 0.9em;
-    transition: background-color 0.3s ease;
-    background-color: #e74c3c;
-    color: white;
-    flex-shrink: 0;
-}
-
-.delete-player-button:hover {
-    background-color: #c0392b;
-}
-
 .danger-button {
     background-color: #e74c3c;
     color: white;
@@ -128,17 +127,19 @@ button {
     width: 48%;
     padding: 15px;
     border-radius: 5px;
-    min-height: 150px;
+    min-height: 200px;
+    display: flex;
+    flex-direction: column;
 }
 
 #attackerTeam {
-    background-color: rgba(255, 99, 132, 0.2); 
-    border: 1px solid rgba(255, 99, 132, 1);
+    background-color: rgba(255, 99, 132, 0.1); 
+    border: 1px solid rgba(255, 99, 132, 0.5);
 }
 
 #defenderTeam {
-    background-color: rgba(75, 192, 192, 0.2); 
-    border: 1px solid rgba(75, 192, 192, 1);
+    background-color: rgba(75, 192, 192, 0.1); 
+    border: 1px solid rgba(75, 192, 192, 0.5);
 }
 
 .team h2 {
@@ -147,18 +148,38 @@ button {
     border-bottom: 1px solid #ccc;
 }
 
+/* Drag & Drop Styles */
 .team ul {
     list-style-type: none;
-    padding: 0;
+    padding: 10px;
+    flex-grow: 1;
+    min-height: 100px;
+    background-color: rgba(255, 255, 255, 0.5);
+    border-radius: 4px;
+    transition: background-color 0.2s;
+}
+
+.team ul.drag-over {
+    background-color: rgba(0, 0, 0, 0.05);
+    border: 1px dashed #666;
 }
 
 .team ul li {
-    padding: 5px 0;
-    border-bottom: 1px dashed #eee;
+    padding: 8px 10px;
+    border: 1px solid #ddd;
+    background-color: #fff;
+    margin-bottom: 8px;
+    border-radius: 4px;
+    cursor: grab;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
 }
 
-.team ul li:last-child {
-    border-bottom: none;
+.team ul li:active {
+    cursor: grabbing;
+}
+
+.team ul li.dragging {
+    opacity: 0.5;
 }
 
 #mapImage {
@@ -194,6 +215,19 @@ button {
     border-radius: 8px;
     position: relative;
     box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+}
+
+.confirm-content {
+    max-width: 400px;
+    text-align: center;
+    margin: 20% auto;
+}
+
+.confirm-buttons {
+    margin-top: 20px;
+    display: flex;
+    justify-content: center;
+    gap: 15px;
 }
 
 .close-button {
@@ -235,6 +269,37 @@ button {
     margin-left: 5px;
 }
 
+/* Toast */
+#toastContainer {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    z-index: 9999;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.toast {
+    background-color: #2ecc71;
+    color: #fff;
+    padding: 12px 20px;
+    border-radius: 4px;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.2);
+    opacity: 0;
+    transform: translateY(20px);
+    transition: opacity 0.3s, transform 0.3s;
+}
+
+.toast.error {
+    background-color: #e74c3c;
+}
+
+.toast.show {
+    opacity: 1;
+    transform: translateY(0);
+}
+
 /* Responsive */
 @media (max-width: 768px) {
     .teams-container {
@@ -243,6 +308,7 @@ button {
     .team {
         width: 100%;
         margin-bottom: 15px;
+        box-sizing: border-box;
     }
     
     .player-entry {
@@ -265,7 +331,7 @@ button {
         box-sizing: border-box;
     }
     
-    .player-entry .delete-player-button {
+    .player-entry button {
         width: 100%;
         box-sizing: border-box;
         margin-top: 5px;

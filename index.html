@@ -16,6 +16,10 @@
 
         <div class="player-input-area">
             <h2>プレイヤー入力</h2>
+            <div class="bulk-actions">
+                <button id="selectAllButton" class="secondary-button">すべて選択</button>
+                <button id="deselectAllButton" class="secondary-button">すべて解除</button>
+            </div>
             <div id="playerEntries">
             </div>
             <button id="addPlayerButton">＋ プレイヤーを追加</button>
@@ -46,7 +50,6 @@
 
         <button id="copyResultButton">📋 結果をコピー</button>
         <textarea id="resultText" style="opacity: 0; position: absolute; left: -9999px;"></textarea>
-
     </div>
 
     <div id="settingsModal" class="modal">
@@ -56,16 +59,14 @@
 
             <div class="setting-section">
                 <h3>ランク設定</h3>
-                <div id="rankSettingsContainer">
-                </div>
+                <div id="rankSettingsContainer"></div>
                 <button id="addRankButton">＋ ランク種類を追加</button>
                 <button id="saveRankSettingsButton">ランク設定を保存</button>
             </div>
 
             <div class="setting-section">
                 <h3>マップ選択</h3>
-                <div id="mapSelectionContainer">
-                </div>
+                <div id="mapSelectionContainer"></div>
                 <button id="saveMapSettingsButton">マップ設定を保存</button>
             </div>
 
@@ -80,6 +81,18 @@
             </div>
         </div>
     </div>
+
+    <div id="confirmModal" class="modal">
+        <div class="modal-content confirm-content">
+            <p id="confirmMessage"></p>
+            <div class="confirm-buttons">
+                <button id="confirmCancelButton" class="secondary-button">キャンセル</button>
+                <button id="confirmOkButton" class="danger-button">実行</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="toastContainer"></div>
 
     <script src="script.js"></script>
 </body>

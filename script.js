@@ -1,5 +1,4 @@
 document.addEventListener('DOMContentLoaded', () => {
-    // DOM Elements
     const playerEntriesContainer = document.getElementById('playerEntries');
     const addPlayerButton = document.getElementById('addPlayerButton');
     const generateTeamsButton = document.getElementById('generateTeamsButton');
@@ -12,7 +11,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const copyResultButton = document.getElementById('copyResultButton');
     const resultTextTextarea = document.getElementById('resultText');
 
-    // Modal Elements
     const settingsModal = document.getElementById('settingsModal');
     const openSettingsButton = document.getElementById('openSettingsButton');
     const closeSettingsButton = document.getElementById('closeSettingsButton');
@@ -24,15 +22,22 @@ document.addEventListener('DOMContentLoaded', () => {
     const resetTeamsButton = document.getElementById('resetTeamsButton');
     const resetAllDataButton = document.getElementById('resetAllDataButton');
 
-    let players = [];
-    let rankTiers = [
-        { name: 'A+', value: 5 },
-        { name: 'A', value: 4 },
-        { name: 'B+', value: 3 },
-        { name: 'B', value: 2 },
-        { name: 'C', value: 1 }
-    ];
+    const selectAllButton = document.getElementById('selectAllButton');
+    const deselectAllButton = document.getElementById('deselectAllButton');
 
+    const confirmModal = document.getElementById('confirmModal');
+    const confirmMessage = document.getElementById('confirmMessage');
+    const confirmOkButton = document.getElementById('confirmOkButton');
+    const confirmCancelButton = document.getElementById('confirmCancelButton');
+
+    let players = [];
+    let currentAttackerTeam = [];
+    let currentDefenderTeam = [];
+    let matchHistory = [];
+    let rankTiers = [
+        { name: 'A+', value: 5 }, { name: 'A', value: 4 },
+        { name: 'B+', value: 3 }, { name: 'B', value: 2 }, { name: 'C', value: 1 }
+    ];
     let allMaps = [
         { name: 'バインド', file: 'Loading_Screen_Bind.webp', selected: true },
         { name: 'ヘイブン', file: 'Loading_Screen_Haven.webp', selected: true },
@@ -45,50 +50,80 @@ document.addEventListener('DOMContentLoaded', () => {
         { name: 'ロータス', file: 'Loading_Screen_Lotus.webp', selected: true },
         { name: 'サンセット', file: 'Loading_Screen_Sunset.webp', selected: true },
         { name: 'アビス', file: 'Loading_Screen_Abyss.webp', selected: true },
-        { name: 'カロード', file: 'Loading_Screen_Corrode.webp', selected: true },
-        { name: 'サミット', file: 'Loading_Screen_Summit.webp', selected: true },
+        { name: 'カロード', file: 'Loading_Screen_Corrode.webp', selected: true }
     ];
     let selectedMap = null;
 
-    // Init
     loadData();
     renderPlayerInputs();
     renderRankSettings();
     renderMapSelection();
     addInitialPlayerEntries();
+    setupDragAndDrop();
 
-    // Events
     addPlayerButton.addEventListener('click', () => {
         addPlayerEntry("", rankTiers[rankTiers.length - 1].name, true); 
         savePlayers();
     });
 
     generateTeamsButton.addEventListener('click', generateTeamsAndMap);
-
-    openSettingsButton.addEventListener('click', () => {
-        settingsModal.style.display = 'block';
-    });
-
-    closeSettingsButton.addEventListener('click', () => {
-        settingsModal.style.display = 'none';
-    });
-
+    openSettingsButton.addEventListener('click', () => settingsModal.style.display = 'block');
+    closeSettingsButton.addEventListener('click', () => settingsModal.style.display = 'none');
     window.addEventListener('click', (event) => {
-        if (event.target === settingsModal) {
-            settingsModal.style.display = 'none';
-        }
+        if (event.target === settingsModal) settingsModal.style.display = 'none';
+        if (event.target === confirmModal) confirmModal.style.display = 'none';
     });
 
     addRankButton.addEventListener('click', addNewRankSettingInput);
     saveRankSettingsButton.addEventListener('click', saveRankSettings);
     saveMapSettingsButton.addEventListener('click', saveMapSettings);
     resetTeamsButton.addEventListener('click', resetTeamDisplay);
-
     copyResultButton.addEventListener('click', copyResultToClipboard);
-    resetAllDataButton.addEventListener('click', resetAllApplicationData);
 
+    selectAllButton.addEventListener('click', () => toggleAllPlayers(true));
+    deselectAllButton.addEventListener('click', () => toggleAllPlayers(false));
 
-    // Functions
+    resetAllDataButton.addEventListener('click', () => {
+        showConfirm("本当にすべてのデータ・履歴をリセットしますか？この操作は元に戻せません。", resetAllApplicationData);
+    });
+
+    function showToast(message, isError = false) {
+        const container = document.getElementById('toastContainer');
+        const toast = document.createElement('div');
+        toast.className = `toast ${isError ? 'error' : ''}`;
+        toast.textContent = message;
+        container.appendChild(toast);
+        
+        requestAnimationFrame(() => toast.classList.add('show'));
+        setTimeout(() => {
+            toast.classList.remove('show');
+            setTimeout(() => toast.remove(), 300);
+        }, 3000);
+    }
+
+    let confirmCallback = null;
+    function showConfirm(message, callback) {
+        confirmMessage.textContent = message;
+        confirmModal.style.display = 'block';
+        confirmCallback = callback;
+    }
+
+    confirmOkButton.addEventListener('click', () => {
+        confirmModal.style.display = 'none';
+        if (confirmCallback) confirmCallback();
+    });
+
+    confirmCancelButton.addEventListener('click', () => {
+        confirmModal.style.display = 'none';
+        confirmCallback = null;
+    });
+
+    function toggleAllPlayers(state) {
+        const checkboxes = document.querySelectorAll('.participation-checkbox');
+        checkboxes.forEach(cb => cb.checked = state);
+        savePlayers();
+    }
+
     function addInitialPlayerEntries() {
         if (players.length === 0) {
             for (let i = 0; i < 5; i++) {
@@ -97,16 +132,16 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    function addPlayerEntry(name = "", rankName = rankTiers[0].name, selected = true, id = Date.now() + Math.random()) {
+    function addPlayerEntry(name = "", rankName = rankTiers[0].name, selected = true, id = null) {
+        const entryId = id || String(Date.now() + Math.random());
         const playerEntryDiv = document.createElement('div');
         playerEntryDiv.classList.add('player-entry');
-        playerEntryDiv.dataset.id = id;
+        playerEntryDiv.dataset.id = entryId;
 
         const participationCheckbox = document.createElement('input');
         participationCheckbox.type = 'checkbox';
         participationCheckbox.checked = selected;
         participationCheckbox.classList.add('participation-checkbox');
-        participationCheckbox.title = "チーム分けに参加させる場合はチェック";
         participationCheckbox.addEventListener('change', savePlayers);
 
         const nameInput = document.createElement('input');
@@ -120,16 +155,13 @@ document.addEventListener('DOMContentLoaded', () => {
             const option = document.createElement('option');
             option.value = tier.name;
             option.textContent = `${tier.name} (${tier.value})`;
-            if (tier.name === rankName) {
-                option.selected = true;
-            }
+            if (tier.name === rankName) option.selected = true;
             rankSelect.appendChild(option);
         });
         rankSelect.addEventListener('change', savePlayers);
 
         const deleteButton = document.createElement('button');
         deleteButton.textContent = '削除';
-        deleteButton.classList.add('delete-player-button');
         deleteButton.addEventListener('click', () => {
             playerEntriesContainer.removeChild(playerEntryDiv);
             savePlayers();
@@ -162,135 +194,246 @@ document.addEventListener('DOMContentLoaded', () => {
         return collectedPlayers;
     }
 
+    function calculateTeamHistoryPenalty(teamA, teamD) {
+        let penalty = 0;
+        matchHistory.forEach((record, index) => {
+            const weight = 1 / (index + 1);
+            penalty += countSharedPairs(teamA, record.attackerTeamIds, record.defenderTeamIds) * weight;
+            penalty += countSharedPairs(teamD, record.attackerTeamIds, record.defenderTeamIds) * weight;
+        });
+        return penalty;
+    }
+
+    function countSharedPairs(currentTeam, pastAttackerIds, pastDefenderIds) {
+        let count = 0;
+        for (let i = 0; i < currentTeam.length; i++) {
+            for (let j = i + 1; j < currentTeam.length; j++) {
+                const id1 = currentTeam[i].id;
+                const id2 = currentTeam[j].id;
+                if ((pastAttackerIds.includes(id1) && pastAttackerIds.includes(id2)) ||
+                    (pastDefenderIds.includes(id1) && pastDefenderIds.includes(id2))) {
+                    count++;
+                }
+            }
+        }
+        return count;
+    }
+
     function generateTeamsAndMap() {
         savePlayers();
-        
         const participants = players.filter(p => p.selected && p.name.trim() !== '');
 
         if (participants.length === 0) {
-            alert('チーム分けに参加するプレイヤー（チェックボックスがオンで名前が入力されている）が1人もいません。');
+            showToast('チーム分けに参加するプレイヤーがいません。', true);
             return;
         }
         if (participants.length > 10) {
-            alert('チーム分けに参加するプレイヤーは最大10人までです。現在 ' + participants.length + ' 人選択されています。');
+            showToast(`参加プレイヤーは最大10人までです（現在${participants.length}人）。`, true);
             return;
         }
         if (participants.length < 2) {
-             alert('チーム分けに参加するプレイヤーは最低2人必要です。現在 ' + participants.length + ' 人選択されています。');
+             showToast('チーム分けには最低2人必要です。', true);
             return;
         }
-
-        let shuffledPlayers = [...participants].sort(() => 0.5 - Math.random());
-        let teamAttacker = [];
-        let teamDefender = [];
-        let rankSumAttacker = 0;
-        let rankSumDefender = 0;
 
         let bestAttackerTeam = [];
         let bestDefenderTeam = [];
         let minDiff = Infinity;
+        let minBalance = Infinity;
+        let minPenalty = Infinity;
 
-        // 1000回試行して最適なバランスを探す
         for (let i = 0; i < 1000; i++) {
             let currentShuffledPlayers = [...participants].sort(() => 0.5 - Math.random());
             let currentAttacker = [];
             let currentDefender = [];
-            let currentRankSumAttacker = 0;
-            let currentRankSumDefender = 0;
+            let sumA = 0;
+            let sumD = 0;
 
-            currentShuffledPlayers.forEach((player, index) => {
+            currentShuffledPlayers.forEach(player => {
                 if (currentAttacker.length < Math.ceil(currentShuffledPlayers.length / 2) &&
-                    (currentAttacker.length <= currentDefender.length || currentRankSumAttacker <= currentRankSumDefender)) {
+                    (currentAttacker.length <= currentDefender.length || sumA <= sumD)) {
                     if (currentAttacker.length < 5) {
                         currentAttacker.push(player);
-                        currentRankSumAttacker += player.rankValue;
+                        sumA += player.rankValue;
                     } else if (currentDefender.length < 5) {
                         currentDefender.push(player);
-                        currentRankSumDefender += player.rankValue;
+                        sumD += player.rankValue;
                     }
                 } else if (currentDefender.length < 5) {
                     currentDefender.push(player);
-                    currentRankSumDefender += player.rankValue;
+                    sumD += player.rankValue;
                 } else if (currentAttacker.length < 5) {
                     currentAttacker.push(player);
-                    currentRankSumAttacker += player.rankValue;
+                    sumA += player.rankValue;
                 }
             });
 
-            // 9人以下で片方のチームが5人を超えないように調整
             if (currentShuffledPlayers.length <= 9) {
                 while (currentAttacker.length > 5 || (currentAttacker.length > currentDefender.length + 1 && currentAttacker.length > Math.ceil(currentShuffledPlayers.length / 2))) {
-                    if (currentDefender.length < 5) {
-                        currentDefender.push(currentAttacker.pop());
-                    } else break; 
+                    if (currentDefender.length < 5) currentDefender.push(currentAttacker.pop());
+                    else break; 
                 }
                 while (currentDefender.length > 5 || (currentDefender.length > currentAttacker.length + 1 && currentDefender.length > Math.ceil(currentShuffledPlayers.length / 2))) {
-                     if (currentAttacker.length < 5) {
-                        currentAttacker.push(currentDefender.pop());
-                    } else break;
+                     if (currentAttacker.length < 5) currentAttacker.push(currentDefender.pop());
+                     else break;
                 }
             }
 
-            const diff = Math.abs(currentRankSumAttacker - currentRankSumDefender);
+            const diff = Math.abs(sumA - sumD);
+            const currentBalance = Math.abs(currentAttacker.length - currentDefender.length);
 
             if (currentShuffledPlayers.length === 1) {
                  bestAttackerTeam = currentAttacker; 
                  bestDefenderTeam = currentDefender;
-                 minDiff = 0; 
                  break; 
             }
 
             if (diff < minDiff) {
                 minDiff = diff;
-                bestAttackerTeam = currentAttacker;
-                bestDefenderTeam = currentDefender;
+                minBalance = currentBalance;
+                minPenalty = calculateTeamHistoryPenalty(currentAttacker, currentDefender);
+                bestAttackerTeam = [...currentAttacker];
+                bestDefenderTeam = [...currentDefender];
             } else if (diff === minDiff) {
-                const currentBalance = Math.abs(currentAttacker.length - currentDefender.length);
-                const bestBalance = Math.abs(bestAttackerTeam.length - bestDefenderTeam.length);
-                if (currentBalance < bestBalance) {
-                    bestAttackerTeam = currentAttacker;
-                    bestDefenderTeam = currentDefender;
+                if (currentBalance < minBalance) {
+                    minBalance = currentBalance;
+                    minPenalty = calculateTeamHistoryPenalty(currentAttacker, currentDefender);
+                    bestAttackerTeam = [...currentAttacker];
+                    bestDefenderTeam = [...currentDefender];
+                } else if (currentBalance === minBalance) {
+                    const penalty = calculateTeamHistoryPenalty(currentAttacker, currentDefender);
+                    if (penalty < minPenalty) {
+                        minPenalty = penalty;
+                        bestAttackerTeam = [...currentAttacker];
+                        bestDefenderTeam = [...currentDefender];
+                    }
                 }
             }
         }
 
-        teamAttacker = bestAttackerTeam;
-        teamDefender = bestDefenderTeam;
-        rankSumAttacker = teamAttacker.reduce((sum, p) => sum + p.rankValue, 0);
-        rankSumDefender = teamDefender.reduce((sum, p) => sum + p.rankValue, 0);
-
-        displayTeam(teamAttacker, attackerPlayersUl);
-        displayTeam(teamDefender, defenderPlayersUl);
-        attackerRankSumSpan.textContent = rankSumAttacker;
-        defenderRankSumSpan.textContent = rankSumDefender;
-
+        currentAttackerTeam = bestAttackerTeam;
+        currentDefenderTeam = bestDefenderTeam;
         selectRandomMap();
-        saveLastTeamAndMap(teamAttacker, teamDefender, rankSumAttacker, rankSumDefender, selectedMap);
+        updateTeamDisplay();
+        recordMatchHistory(currentAttackerTeam, currentDefenderTeam, selectedMap);
     }
 
-    function displayTeam(team, ulElement) {
+    function setupDragAndDrop() {
+        [attackerPlayersUl, defenderPlayersUl].forEach(ul => {
+            ul.addEventListener('dragover', e => {
+                e.preventDefault();
+                ul.classList.add('drag-over');
+            });
+            ul.addEventListener('dragleave', () => ul.classList.remove('drag-over'));
+            ul.addEventListener('drop', e => {
+                e.preventDefault();
+                ul.classList.remove('drag-over');
+                const playerId = e.dataTransfer.getData('text/plain');
+                movePlayer(playerId, ul.id);
+            });
+        });
+    }
+
+    function movePlayer(playerId, targetUlId) {
+        let playerIndex = currentAttackerTeam.findIndex(p => p.id === playerId);
+        let player = null;
+        let sourceTeam = null;
+
+        if (playerIndex !== -1) {
+            player = currentAttackerTeam[playerIndex];
+            sourceTeam = 'attacker';
+        } else {
+            playerIndex = currentDefenderTeam.findIndex(p => p.id === playerId);
+            if (playerIndex !== -1) {
+                player = currentDefenderTeam[playerIndex];
+                sourceTeam = 'defender';
+            }
+        }
+
+        if (!player) return;
+        if ((sourceTeam === 'attacker' && targetUlId === 'attackerPlayers') || 
+            (sourceTeam === 'defender' && targetUlId === 'defenderPlayers')) return;
+
+        if (sourceTeam === 'attacker') {
+            currentAttackerTeam.splice(playerIndex, 1);
+            currentDefenderTeam.push(player);
+        } else {
+            currentDefenderTeam.splice(playerIndex, 1);
+            currentAttackerTeam.push(player);
+        }
+
+        updateTeamDisplay();
+        recordMatchHistory(currentAttackerTeam, currentDefenderTeam, selectedMap);
+    }
+
+    function updateTeamDisplay() {
+        renderTeamList(currentAttackerTeam, attackerPlayersUl);
+        renderTeamList(currentDefenderTeam, defenderPlayersUl);
+        
+        const sumA = currentAttackerTeam.reduce((sum, p) => sum + p.rankValue, 0);
+        const sumD = currentDefenderTeam.reduce((sum, p) => sum + p.rankValue, 0);
+        
+        attackerRankSumSpan.textContent = sumA;
+        defenderRankSumSpan.textContent = sumD;
+
+        saveLastTeamAndMap(currentAttackerTeam, currentDefenderTeam, sumA, sumD, selectedMap);
+    }
+
+    function renderTeamList(team, ulElement) {
         ulElement.innerHTML = '';
         team.forEach(player => {
             const li = document.createElement('li');
             li.textContent = `${player.name} (ランク: ${player.rankName})`;
+            li.draggable = true;
+            li.dataset.id = player.id;
+
+            li.addEventListener('dragstart', (e) => {
+                li.classList.add('dragging');
+                e.dataTransfer.setData('text/plain', player.id);
+                e.dataTransfer.effectAllowed = 'move';
+            });
+            li.addEventListener('dragend', () => li.classList.remove('dragging'));
             ulElement.appendChild(li);
         });
     }
 
     function selectRandomMap() {
         const availableMaps = allMaps.filter(map => map.selected);
-        if (availableMaps.length > 0) {
-            selectedMap = availableMaps[Math.floor(Math.random() * availableMaps.length)];
-            mapNameP.textContent = selectedMap.name;
-            mapImageImg.src = `img/${selectedMap.file}`;
-            mapImageImg.alt = selectedMap.name;
-            mapImageImg.style.display = 'block';
-        } else {
+        if (availableMaps.length === 0) {
             mapNameP.textContent = '選択可能なマップがありません';
             mapImageImg.src = '';
             mapImageImg.style.display = 'none';
             selectedMap = null;
+            return;
         }
+
+        const mapWeights = availableMaps.map(map => {
+            let weight = 1.0;
+            matchHistory.forEach((record, index) => {
+                if (record.mapName === map.name) {
+                    const penaltyFactor = 1 - (1 / (index + 1.5));
+                    weight *= Math.max(0.1, penaltyFactor);
+                }
+            });
+            return { map, weight };
+        });
+
+        const totalWeight = mapWeights.reduce((sum, item) => sum + item.weight, 0);
+        let randomValue = Math.random() * totalWeight;
+        
+        for (const item of mapWeights) {
+            randomValue -= item.weight;
+            if (randomValue <= 0) {
+                selectedMap = item.map;
+                break;
+            }
+        }
+        if (!selectedMap) selectedMap = mapWeights[mapWeights.length - 1].map;
+
+        mapNameP.textContent = selectedMap.name;
+        mapImageImg.src = `img/${selectedMap.file}`;
+        mapImageImg.alt = selectedMap.name;
+        mapImageImg.style.display = 'block';
     }
 
     function renderPlayerInputs() {
@@ -327,7 +470,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const deleteRankButton = document.createElement('button');
             deleteRankButton.textContent = '×';
-            deleteRankButton.classList.add('delete-rank-button');
             deleteRankButton.addEventListener('click', () => {
                 rankTiers.splice(index, 1);
                 renderRankSettings();
@@ -376,7 +518,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         if (!valid || newRankTiers.length === 0) {
-            alert('すべてのランク名と有効な数値を入力してください。');
+            showToast('すべてのランク名と有効な数値を入力してください。', true);
             renderRankSettings(); 
             return;
         }
@@ -386,7 +528,7 @@ document.addEventListener('DOMContentLoaded', () => {
         renderRankSettings(); 
         updateAllPlayerRankSelects(); 
         localStorage.setItem('valorantRankTiers', JSON.stringify(rankTiers));
-        alert('ランク設定を保存しました。');
+        showToast('ランク設定を保存しました。');
     }
 
     function updateAllPlayerRankSelects() {
@@ -436,50 +578,45 @@ document.addEventListener('DOMContentLoaded', () => {
         checkboxes.forEach(checkbox => {
             const mapName = checkbox.dataset.mapName;
             const mapObj = allMaps.find(m => m.name === mapName);
-            if (mapObj) {
-                mapObj.selected = checkbox.checked;
-            }
+            if (mapObj) mapObj.selected = checkbox.checked;
         });
         localStorage.setItem('valorantMaps', JSON.stringify(allMaps));
-        alert('マップ設定を保存しました。');
+        showToast('マップ設定を保存しました。');
     }
 
     function resetTeamDisplay() {
-        attackerPlayersUl.innerHTML = '';
-        defenderPlayersUl.innerHTML = '';
-        attackerRankSumSpan.textContent = '0';
-        defenderRankSumSpan.textContent = '0';
+        currentAttackerTeam = [];
+        currentDefenderTeam = [];
+        selectedMap = null;
+        updateTeamDisplay();
         mapNameP.textContent = 'マップはまだ選択されていません';
         mapImageImg.src = '';
         mapImageImg.style.display = 'none';
-        selectedMap = null;
         localStorage.removeItem('lastTeamData');
-        alert('チーム表示とマップをリセットしました。');
+        showToast('チーム表示とマップをリセットしました。');
     }
 
     function copyResultToClipboard() {
-        if (!selectedMap || attackerPlayersUl.children.length === 0 && defenderPlayersUl.children.length === 0) {
-            alert('チーム分けとマップ選択を先に実行してください。');
+        if (!selectedMap || (attackerPlayersUl.children.length === 0 && defenderPlayersUl.children.length === 0)) {
+            showToast('チーム分けとマップ選択を先に実行してください。', true);
             return;
         }
 
-        const attackerNames = Array.from(attackerPlayersUl.children).map(li => li.textContent.split(' (ランク:')[0]);
-        const defenderNames = Array.from(defenderPlayersUl.children).map(li => li.textContent.split(' (ランク:')[0]);
+        const attackerNames = currentAttackerTeam.map(p => p.name);
+        const defenderNames = currentDefenderTeam.map(p => p.name);
 
         const textToCopy = `マップ : ${selectedMap.name} | アタッカー : ${attackerNames.join(', ')} | ディフェンダー : ${defenderNames.join(', ')}`;
         resultTextTextarea.value = textToCopy;
         resultTextTextarea.select();
         try {
             document.execCommand('copy');
-            alert('結果をクリップボードにコピーしました！');
+            showToast('結果をクリップボードにコピーしました！');
         } catch (err) {
-            alert('コピーに失敗しました。手動でコピーしてください。');
-            console.error('Copy failed:', err);
+            showToast('コピーに失敗しました。手動でコピーしてください。', true);
         }
         resultTextTextarea.blur();
     }
 
-    // Local Storage
     function savePlayers() {
         players = collectPlayersData();
         localStorage.setItem('valorantPlayers', JSON.stringify(players));
@@ -490,8 +627,8 @@ document.addEventListener('DOMContentLoaded', () => {
         if (storedPlayers) {
             players = JSON.parse(storedPlayers).map(player => ({
                 ...player,
-                // 古いデータとの互換性確保
-                selected: player.selected !== undefined ? player.selected : true 
+                selected: player.selected !== undefined ? player.selected : true,
+                id: player.id || String(Date.now() + Math.random())
             }));
         } else {
             players = [];
@@ -500,9 +637,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function loadRankTiers() {
         const storedRankTiers = localStorage.getItem('valorantRankTiers');
-        if (storedRankTiers) {
-            rankTiers = JSON.parse(storedRankTiers);
-        }
+        if (storedRankTiers) rankTiers = JSON.parse(storedRankTiers);
     }
 
     function loadMaps() {
@@ -518,8 +653,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function saveLastTeamAndMap(teamA, teamD, sumA, sumD, map) {
         const lastTeamData = {
-            attackerTeam: teamA.map(p => ({name: p.name, rankName: p.rankName})),
-            defenderTeam: teamD.map(p => ({name: p.name, rankName: p.rankName})),
+            attackerTeam: teamA.map(p => ({id: p.id, name: p.name, rankName: p.rankName, rankValue: p.rankValue})),
+            defenderTeam: teamD.map(p => ({id: p.id, name: p.name, rankName: p.rankName, rankValue: p.rankValue})),
             attackerRankSum: sumA,
             defenderRankSum: sumD,
             selectedMap: map
@@ -532,11 +667,14 @@ document.addEventListener('DOMContentLoaded', () => {
         if (lastData) {
             const data = JSON.parse(lastData);
             if (data.attackerTeam && data.defenderTeam && data.selectedMap) {
-                displayTeam(data.attackerTeam, attackerPlayersUl);
-                displayTeam(data.defenderTeam, defenderPlayersUl);
-                attackerRankSumSpan.textContent = data.attackerRankSum;
-                defenderRankSumSpan.textContent = data.defenderRankSum;
+                currentAttackerTeam = data.attackerTeam.map(p => ({
+                    ...p, id: p.id || String(Date.now() + Math.random()), rankValue: p.rankValue || 0
+                }));
+                currentDefenderTeam = data.defenderTeam.map(p => ({
+                    ...p, id: p.id || String(Date.now() + Math.random()), rankValue: p.rankValue || 0
+                }));
                 selectedMap = data.selectedMap;
+                updateTeamDisplay();
                 mapNameP.textContent = selectedMap.name;
                 mapImageImg.src = `img/${selectedMap.file}`;
                 mapImageImg.alt = selectedMap.name;
@@ -545,36 +683,54 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    function recordMatchHistory(teamA, teamD, map) {
+        if (!map || teamA.length === 0 || teamD.length === 0) return;
+        const record = {
+            attackerTeamIds: teamA.map(p => p.id),
+            defenderTeamIds: teamD.map(p => p.id),
+            mapName: map.name
+        };
+        matchHistory.unshift(record);
+        if (matchHistory.length > 10) matchHistory.pop();
+        localStorage.setItem('valorantMatchHistory', JSON.stringify(matchHistory));
+    }
+
+    function loadMatchHistory() {
+        const storedHistory = localStorage.getItem('valorantMatchHistory');
+        if (storedHistory) matchHistory = JSON.parse(storedHistory);
+    }
+
     function loadData() {
         loadRankTiers();
         loadMaps();
-        loadPlayers(); 
+        loadPlayers();
+        loadMatchHistory();
         renderPlayerInputs(); 
         updateAllPlayerRankSelects(); 
         loadLastTeamAndMap(); 
     }
 
     function resetAllApplicationData() {
-        if (confirm("本当にすべてのプレイヤー情報、ランク設定、マップ設定をリセットしますか？この操作は元に戻せません。")) {
-            localStorage.removeItem('valorantPlayers');
-            localStorage.removeItem('valorantRankTiers');
-            localStorage.removeItem('valorantMaps');
-            localStorage.removeItem('lastTeamData');
+        localStorage.removeItem('valorantPlayers');
+        localStorage.removeItem('valorantRankTiers');
+        localStorage.removeItem('valorantMaps');
+        localStorage.removeItem('lastTeamData');
+        localStorage.removeItem('valorantMatchHistory');
 
-            players = [];
-            rankTiers = [
-                { name: 'A+', value: 5 }, { name: 'A', value: 4 },
-                { name: 'B+', value: 3 }, { name: 'B', value: 2 }, { name: 'C', value: 1 }
-            ];
-            allMaps.forEach(map => map.selected = true); 
+        players = [];
+        matchHistory = [];
+        rankTiers = [
+            { name: 'A+', value: 5 }, { name: 'A', value: 4 },
+            { name: 'B+', value: 3 }, { name: 'B', value: 2 }, { name: 'C', value: 1 }
+        ];
+        allMaps.forEach(map => map.selected = true); 
 
-            renderPlayerInputs(); 
-            addInitialPlayerEntries(); 
-            renderRankSettings();
-            renderMapSelection();
-            resetTeamDisplay();
+        renderPlayerInputs(); 
+        addInitialPlayerEntries(); 
+        renderRankSettings();
+        renderMapSelection();
+        resetTeamDisplay();
 
-            alert("すべてのデータがリセットされました。");
-        }
+        showToast("すべてのデータがリセットされました。");
     }
 });
